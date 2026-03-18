@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProImage Compressor | Professional Image Optimization</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f4ff',
+                            100: '#e0e9ff',
+                            200: '#c7d7fe',
+                            300: '#a5b8fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        },
+                        secondary: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            200: '#ddd6fe',
+                            300: '#c4b5fd',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+                    },
+                    boxShadow: {
+                        'soft': '0 8px 32px rgba(99, 102, 241, 0.1)',
+                        'soft-md': '0 4px 24px rgba(99, 102, 241, 0.15)',
+                        'soft-lg': '0 10px 50px rgba(99, 102, 241, 0.2)'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- React CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- JSZip for zip downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        .drop-zone {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .drop-zone--over {
+            border-color: #6366f1;
+            background-color: rgba(99, 102, 241, 0.05);
+            transform: translateY(-2px);
+        }
+        .file-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .file-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #f0f4ff 0%, #f5f3ff 100%);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        .file-pill {
+            transition: all 0.2s ease;
+        }
+        .file-pill:hover {
+            background-color: #e0e7ff;
+        }
+        .file-pill-remove {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .file-pill:hover .file-pill-remove {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen font-sans antialiased">
+    <div id="root" class="container mx-auto px-4 py-12"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        function ProgressRing({ progress, size = 48, stroke = 4 }) {
+            const radius = (size / 2) - (stroke * 2);
+            const circumference = radius * 2 * Math.PI;
+            const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+            return (
+                <div className="relative inline-flex items-center justify-center">
+                    <svg className="transform -rotate-90" width={size} height={size}>
+                        <circle
+                            className="text-gray-200"
+                            strokeWidth={stroke}
+                            stroke="currentColor"
+                            fill="transparent"
+                            r={radius}
+                            cx={size / 2}
+                            cy={size / 2}
+                        />
+                        <circle
+                            className="text-primary-600"
+                            strokeWidth={stroke}
+                            strokeDasharray={circumference}
+                            strokeDashoffset={strokeDashoffset}
+                            strokeLinecap="round"
+                            stroke="currentColor"
+                            fill="transparent"
+                            r={radius}
+                            cx={size / 2}
+                            cy={size / 2}
+                        />
+                    </svg>
+                    <span className="absolute text-sm font-medium text-gray-700">
+                        {progress}%
+                    </span>
+                </div>
+            );
+        }
+
+        function ImageCompressor() {
+            const [files, setFiles] = useState([]);
+            const [outputFormat, setOutputFormat] = useState('webp');
+            const [compressedFiles, setCompressedFiles] = useState([]);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [processingProgress, setProcessingProgress] = useState(0);
+            const [quality, setQuality] = useState(85);
+            const [error, setError] = useState('');
+            const [isDragOver, setIsDragOver] = useState(false);
+            const fileInputRef = useRef(null);
+            const dropZoneRef = useRef(null);
+
+            const formats = [
+                { value: 'webp', label: 'WEBP (Modern)' },
+                { value: 'jpeg', label: 'JPEG (Best for photos)' },
+                { value: 'png', label: 'PNG (Lossless)' }
+            ];
+
+            // Supported image types
+            const supportedTypes = [
+                'image/jpeg',
+                'image/png',
+                'image/webp',
+                'image/gif',
+                'image/svg+xml',
+                'image/bmp',
+                'image/tiff',
+                'image/x-icon'
+            ];
+
+            // Handle drag and drop events
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                setIsDragOver(true);
+            };
+
+            const handleDragLeave = () => {
+                setIsDragOver(false);
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                
+                if (e.dataTransfer.files.length) {
+                    handleFileSelect(Array.from(e.dataTransfer.files));
+                }
+            };
+
+            const handleFileInput = (e) => {
+                if (e.target.files.length) {
+                    handleFileSelect(Array.from(e.target.files));
+                    e.target.value = ''; // Reset input to allow selecting same files again
+                }
+            };
+
+            const handleFileSelect = (selectedFiles) => {
+                const validFiles = [];
+                const invalidFiles = [];
+                
+                selectedFiles.forEach(file => {
+                    if (!file.type.match('image.*') && !supportedTypes.includes(file.type)) {
+                        invalidFiles.push(file.name);
+                        return;
+                    }
+
+                    if (file.size > 20 * 1024 * 1024) { // 20MB limit
+                        invalidFiles.push(`${file.name} (too large)`);
+                        return;
+                    }
+
+                    validFiles.push(file);
+                });
+
+                if (invalidFiles.length > 0) {
+                    setError(`Some files were not accepted: ${invalidFiles.join(', ')}. Only image files under 20MB are supported.`);
+                }
+
+                if (validFiles.length > 0) {
+                    setError('');
+                    setFiles(prev => [...prev, ...validFiles]);
+                    setCompressedFiles([]);
+                }
+            };
+
+            const removeFile = (index) => {
+                setFiles(prev => prev.filter((_, i) => i !== index));
+                setCompressedFiles(prev => prev.filter((_, i) => i !== index));
+            };
+
+            const clearAllFiles = () => {
+                setFiles([]);
+                setCompressedFiles([]);
+                setError('');
+            };
+
+            const compressImages = async () => {
+                if (files.length === 0) return;
+
+                setIsProcessing(true);
+                setProcessingProgress(0);
+                setError('');
+                
+                try {
+                    const newCompressedFiles = [];
+                    
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const reader = new FileReader();
+                        
+                        // Read the file as data URL
+                        const fileUrl = await new Promise((resolve, reject) => {
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.onerror = () => reject(new Error('Failed to read file'));
+                            reader.readAsDataURL(file);
+                        });
+
+                        const img = new Image();
+                        img.src = fileUrl;
+                        
+                        await new Promise((resolve, reject) => {
+                            img.onload = resolve;
+                            img.onerror = () => reject(new Error('Failed to load image'));
+                        });
+
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Set canvas dimensions to image dimensions
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        
+                        // Draw image on canvas
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Convert to selected format with quality setting
+                        let mimeType;
+                        switch(outputFormat) {
+                            case 'webp':
+                                mimeType = 'image/webp';
+                                break;
+                            case 'jpeg':
+                                mimeType = 'image/jpeg';
+                                break;
+                            case 'png':
+                                mimeType = 'image/png';
+                                break;
+                            default:
+                                mimeType = 'image/webp';
+                        }
+                        
+                        // Convert quality from percentage (0-100) to decimal (0-1) for PNG
+                        const qualityDecimal = outputFormat === 'png' 
+                            ? Math.min(1, quality / 100) 
+                            : quality / 100;
+                        
+                        // Perform the actual compression
+                        const blob = await new Promise((resolve) => {
+                            canvas.toBlob(
+                                (blob) => resolve(blob),
+                                mimeType,
+                                qualityDecimal
+                            );
+                        });
+                        
+                        // Keep original filename but change extension
+                        const originalName = file.name;
+                        const dotIndex = originalName.lastIndexOf('.');
+                        const baseName = dotIndex === -1 ? originalName : originalName.substring(0, dotIndex);
+                        const newName = `${baseName}.${outputFormat}`;
+                        
+                        newCompressedFiles.push({
+                            originalFile: file,
+                            compressedBlob: blob,
+                            name: newName
+                        });
+                        
+                        // Update progress
+                        setProcessingProgress(Math.round(((i + 1) / files.length) * 100));
+                    }
+                    
+                    setCompressedFiles(newCompressedFiles);
+                } catch (err) {
+                    setError('Error compressing images: ' + err.message);
+                    console.error(err);
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
+
+            const downloadCompressedImage = (index) => {
+                if (!compressedFiles[index]) return;
+                
+                const { compressedBlob, name } = compressedFiles[index];
+                const url = URL.createObjectURL(compressedBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+
+            const downloadAllAsZip = async () => {
+                if (compressedFiles.length === 0) return;
+                
+                try {
+                    const zip = new JSZip();
+                    const folder = zip.folder("compressed_images");
+                    
+                    compressedFiles.forEach((file, index) => {
+                        folder.file(file.name, file.compressedBlob);
+                    });
+                    
+                    const content = await zip.generateAsync({ type: "blob" });
+                    saveAs(content, "compressed_images.zip");
+                } catch (err) {
+                    setError('Error creating ZIP file: ' + err.message);
+                    console.error(err);
+                }
+            };
+
+            const formatBytes = (bytes, decimals = 2) => {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const dm = decimals < 0 ? 0 : decimals;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+            };
+
+            const calculateReduction = (originalSize, compressedSize) => {
+                if (!originalSize || !compressedSize) return '0%';
+                const reduction = ((originalSize - compressedSize) / originalSize) * 100;
+                return reduction.toFixed(2) + '%';
+            };
+
+            return (
+                <div className="max-w-6xl mx-auto">
+                    <header className="mb-12 text-center">
+                        <h1 className="text-5xl font-bold text-gray-900 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600">
+                            Izy-Compress
+                        </h1>
+                        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                            Optimize your images without quality loss. Convert to WEBP, JPEG, or PNG with professional-grade compression.
+                        </p>
+                    </header>
+                    
+                    <div className="bg-white rounded-2xl shadow-soft-lg overflow-hidden">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8">
+                            {/* Upload Section */}
+                            <div>
+                                <div 
+                                    ref={dropZoneRef}
+                                    className={`drop-zone border-2 border-dashed rounded-xl p-12 text-center cursor-pointer mb-8 transition-all ${isDragOver ? 'drop-zone--over border-primary-500 bg-primary-50 shadow-soft-md' : 'border-gray-200 hover:border-primary-300'}`}
+                                    onDragOver={handleDragOver}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={handleDrop}
+                                    onClick={() => fileInputRef.current.click()}
+                                >
+                                    <div className="flex flex-col items-center justify-center space-y-4">
+                                        <div className="p-4 bg-primary-100 rounded-full shadow-inner">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                        </div>
+                                        <h3 className="text-xl font-semibold text-gray-800">Drag & drop your images</h3>
+                                        <p className="text-gray-500">or click to browse files</p>
+                                        <p className="text-xs text-gray-400 mt-2 px-4 py-1.5 bg-gray-100 rounded-full">Supports JPG, PNG, WEBP, GIF, SVG, BMP (Max 20MB each)</p>
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef}
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={handleFileInput}
+                                        multiple
+                                    />
+                                </div>
+                                
+                                {error && (
+                                    <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg flex items-start">
+                                        <svg className="h-5 w-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                        </svg>
+                                        <p>{error}</p>
+                                    </div>
+                                )}
+                                
+                                {/* Selected Files */}
+                                {files.length > 0 && (
+                                    <div className="mb-6">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="text-lg font-medium text-gray-800">
+                                                Selected Files ({files.length})
+                                            </h3>
+                                            <button 
+                                                onClick={clearAllFiles}
+                                                className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                Clear All
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                                            {files.map((file, index) => (
+                                                <div 
+                                                    key={index}
+                                                    className="file-pill flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200"
+                                                >
+                                                    <div className="flex items-center truncate">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                        </svg>
+                                                        <span className="truncate text-gray-700">{file.name}</span>
+                                                        <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">{formatBytes(file.size)}</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => removeFile(index)}
+                                                        className="file-pill-remove text-gray-400 hover:text-red-500 ml-2"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Settings Panel */}
+                                <div className="bg-gray-50 rounded-xl p-6 shadow-inner">
+                                    <h3 className="text-xl font-semibold text-gray-800 mb-5 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        Compression Settings
+                                    </h3>
+                                    
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label htmlFor="format" className="block text-sm font-medium text-gray-700 mb-2">Output Format</label>
+                                            <div className="relative">
+                                                <select
+                                                    id="format"
+                                                    className="w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-gray-700 py-3 pl-4 pr-10 appearance-none bg-white"
+                                                    value={outputFormat}
+                                                    onChange={(e) => setOutputFormat(e.target.value)}
+                                                    disabled={isProcessing}
+                                                >
+                                                    {formats.map(format => (
+                                                        <option key={format.value} value={format.value}>{format.label}</option>
+                                                    ))}
+                                                </select>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label htmlFor="quality" className="block text-sm font-medium text-gray-700">
+                                                    Compression Quality
+                                                </label>
+                                                <span className="text-sm font-medium bg-primary-100 text-primary-800 px-2.5 py-0.5 rounded-full">{quality}%</span>
+                                            </div>
+                                            <input
+                                                id="quality"
+                                                type="range"
+                                                min="1"
+                                                max="100"
+                                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
+                                                value={quality}
+                                                onChange={(e) => setQuality(parseInt(e.target.value))}
+                                                disabled={isProcessing}
+                                            />
+                                            <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                                <span>Smaller file</span>
+                                                <span>Better quality</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <button
+                                            className={`w-full px-6 py-4 rounded-xl text-white font-semibold flex items-center justify-center space-x-3 transition-all ${isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'btn-primary hover:shadow-soft-lg'}`}
+                                            onClick={compressImages}
+                                            disabled={files.length === 0 || isProcessing}
+                                        >
+                                            {isProcessing ? (
+                                                <>
+                                                    <ProgressRing progress={processingProgress} size={24} stroke={2} />
+                                                    <span>Processing {processingProgress}%...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                                                    </svg>
+                                                    <span>Optimize {files.length > 1 ? `${files.length} Images` : 'Image'}</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Preview Section */}
+                            <div>
+                                {files.length > 0 ? (
+                                    <div className="space-y-6">
+                                        <div className="bg-gray-50 rounded-xl p-6 shadow-inner">
+                                            <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                Compression Results
+                                            </h3>
+                                            
+                                            {compressedFiles.length > 0 && (
+                                                <div className="mb-6">
+                                                    <div className="flex justify-between items-center mb-4">
+                                                        <h4 className="text-lg font-medium text-gray-700">
+                                                            Optimized Files ({compressedFiles.length})
+                                                        </h4>
+                                                        <button
+                                                            onClick={downloadAllAsZip}
+                                                            className="px-4 py-2 btn-primary text-white rounded-lg font-medium flex items-center space-x-2 transition-all hover:shadow-soft-md"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                            </svg>
+                                                            <span>Download All as ZIP</span>
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                                                        {compressedFiles.map((file, index) => (
+                                                            <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                                                <div className="flex justify-between items-start mb-2">
+                                                                    <div className="truncate">
+                                                                        <p className="font-medium text-gray-900 truncate">{file.name}</p>
+                                                                        <p className="text-sm text-gray-500">
+                                                                            {formatBytes(file.compressedBlob.size)} • {calculateReduction(file.originalFile.size, file.compressedBlob.size)} smaller
+                                                                        </p>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => downloadCompressedImage(index)}
+                                                                        className="text-sm px-3 py-1.5 btn-secondary text-gray-700 rounded-lg font-medium flex items-center space-x-1.5 transition-all"
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                                        </svg>
+                                                                        <span>Download</span>
+                                                                    </button>
+                                                                </div>
+                                                                <div className="flex justify-between items-center text-xs text-gray-500">
+                                                                    <span>Original: {formatBytes(file.originalFile.size)}</span>
+                                                                    <span>Optimized: {formatBytes(file.compressedBlob.size)}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            <h4 className="text-lg font-medium text-gray-700 mb-3">
+                                                Image Previews
+                                            </h4>
+                                            
+                                            <div className="grid gap-4">
+                                                {files.slice(0, 2).map((file, index) => (
+                                                    <div key={index} className="file-card bg-white border border-gray-200 rounded-xl overflow-hidden shadow-md">
+                                                        <div className="bg-gray-100 p-3 border-b flex items-center">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                            </svg>
+                                                            <h4 className="font-medium text-gray-700 truncate">{file.name}</h4>
+                                                        </div>
+                                                        <div className="p-4">
+                                                            <img 
+                                                                src={URL.createObjectURL(file)} 
+                                                                alt="Preview" 
+                                                                className="w-full h-auto max-h-64 object-contain mx-auto rounded-lg"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                
+                                                {files.length > 2 && (
+                                                    <div className="text-center text-gray-500">
+                                                        + {files.length - 2} more images
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center bg-gray-50 rounded-xl p-12 border-2 border-dashed border-gray-200 text-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-400 mb-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <h3 className="text-xl font-semibold text-gray-700 mb-3">No Images Selected</h3>
+                                        <p className="text-gray-500 max-w-md mb-6">
+                                            Upload one or more images to see the optimization preview and compression results.
+                                        </p>
+                                        <button
+                                            onClick={() => fileInputRef.current.click()}
+                                            className="px-5 py-2.5 btn-secondary text-gray-700 rounded-lg font-medium flex items-center space-x-2 transition-all"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            <span>Select Images</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="bg-gray-50 border-t px-8 py-6">
+                            <div className="flex flex-col md:flex-row justify-between items-center">
+                                <p className="text-sm text-gray-500 mb-2 md:mb-0">
+                                    ProImage Compressor uses advanced browser-based compression - your images never leave your device
+                                </p>
+                                <div className="flex space-x-4">
+                                    <button className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                        Privacy Policy
+                                    </button>
+                                    <button className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m7 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Terms
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ImageCompressor />);
+    </script>
+</body>
+</html>
